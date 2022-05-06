@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_firebase_list_app/extensions/firebase_firestore_extension.dart';
 import 'package:flutter_firebase_list_app/models/item_model.dart';
 import 'package:flutter_firebase_list_app/repositries/general_providers.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -9,10 +10,13 @@ import 'customException.dart';
 
 abstract class BaseItemRepositry {
   Future<List<Item>> retrieveItems({required String userId});
-  Future<String> createItems({required String userId, required Item item});
-  Future<void> updateItems({required String userId, required Item item});
-  Future<void> deleteItems({required String userId, required String itemId});
+  Future<String> createItem({required String userId, required Item item});
+  Future<void> updateItem({required String userId, required Item item});
+  Future<void> deleteItem({required String userId, required String itemId});
 }
+
+final itemRepositoryProvider =
+    Provider<ItemRepositry>(((ref) => ItemRepositry(ref.read)));
 
 class ItemRepositry implements BaseItemRepositry {
   final Reader _read;
@@ -22,11 +26,8 @@ class ItemRepositry implements BaseItemRepositry {
   @override
   Future<List<Item>> retrieveItems({required String userId}) async {
     try {
-      final snap = await _read(firebaseFirestoreProvider)
-          .collection('lists')
-          .doc(userId)
-          .collection('userList')
-          .get();
+      final snap =
+          await _read(firebaseFirestoreProvider).usersListRef(userId).get();
       return snap.docs.map((doc) => Item.fromDocument(doc)).toList();
     } on FirebaseException catch (e) {
       throw CustomException(message: e.message);
@@ -34,13 +35,11 @@ class ItemRepositry implements BaseItemRepositry {
   }
 
   @override
-  Future<String> createItems(
+  Future<String> createItem(
       {required String userId, required Item item}) async {
     try {
       final docRef = await _read(firebaseFirestoreProvider)
-          .collection('lists')
-          .doc(userId)
-          .collection('userList')
+          .usersListRef(userId)
           .add(item.toDocument());
       return docRef.id;
     } on FirebaseException catch (e) {
@@ -49,13 +48,11 @@ class ItemRepositry implements BaseItemRepositry {
   }
 
   @override
-  Future<void> deleteItems(
+  Future<void> deleteItem(
       {required String userId, required String itemId}) async {
     try {
       await _read(firebaseFirestoreProvider)
-          .collection('lists')
-          .doc(userId)
-          .collection('userList')
+          .usersListRef(userId)
           .doc(itemId)
           .delete();
     } on FirebaseException catch (e) {
@@ -65,12 +62,10 @@ class ItemRepositry implements BaseItemRepositry {
   }
 
   @override
-  Future<void> updateItems({required String userId, required Item item}) async {
+  Future<void> updateItem({required String userId, required Item item}) async {
     try {
       await _read(firebaseFirestoreProvider)
-          .collection('lists')
-          .doc(userId)
-          .collection('userLists')
+          .usersListRef(userId)
           .doc(item.id)
           .update(item.toDocument());
     } on FirebaseException catch (e) {
