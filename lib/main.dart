@@ -1,4 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_firebase_list_app/controllers/auth_controller.dart';
 import 'package:flutter_firebase_list_app/models/item_model.dart';
@@ -32,7 +33,18 @@ class MyApp extends StatelessWidget {
 class HomeScreen extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen<CustomException?>(
+      itemListExceptionProvider,
+      (previous, next) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          backgroundColor: Colors.red,
+          content: Text(next!.message!),
+        ));
+      },
+    );
     final authControllerState = ref.watch(authControllerProvider);
+    final toggleObtained = ref.watch(itemListFilterProvider);
+    final toggleValue = toggleObtained == ItemListFilter.obtained;
     return Scaffold(
       appBar: AppBar(
         title: Text('shopping List'),
@@ -43,8 +55,21 @@ class HomeScreen extends HookConsumerWidget {
                     ref.read(authControllerProvider.notifier).signOut(),
               )
             : null,
+        actions: [
+          IconButton(
+            icon: Icon(
+              toggleValue ? Icons.check_circle : Icons.check_circle_outline,
+            ),
+            onPressed: () {
+              ref.read(itemListFilterProvider.state).state =
+                  toggleValue ? ItemListFilter.all : ItemListFilter.obtained;
+            },
+          ),
+        ],
       ),
-      body: WidgetRef.listen(itemListControllerProvider,(StateController<CustomException?> customException)),
+      body: Container(
+        child: const ItemList(),
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => AddItemDialog.show(context, Item.empty()),
         child: Icon(Icons.add),
@@ -110,6 +135,90 @@ class AddItemDialog extends HookConsumerWidget {
               )),
         ],
       ),
+    ));
+  }
+}
+
+final currentItem = Provider<Item>((ref) => throw UnimplementedError());
+
+class ItemList extends HookConsumerWidget {
+  const ItemList({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final itemListState = ref.watch(itemListControllerProvider);
+    final filteredItemList = ref.watch(filteredItemListProvider);
+    return itemListState.when(
+        data: (items) => items.isEmpty
+            ? const Center(
+                child: Text(
+                  'アイテムを入力してください',
+                  style: TextStyle(fontSize: 20),
+                ),
+              )
+            : ListView.builder(
+                itemCount: filteredItemList.length,
+                itemBuilder: (BuildContext context, int index) {
+                  final item = filteredItemList[index];
+                  return ProviderScope(
+                    overrides: [currentItem.overrideWithValue(item)],
+                    child: ItemTile(),
+                  );
+                }),
+        error: (error, _) => ItemListError(
+            message: error is CustomException ? error.message! : 'エラーです'),
+        loading: () => const Center(
+              child: CircularProgressIndicator(),
+            ));
+  }
+}
+
+class ItemTile extends HookConsumerWidget {
+  const ItemTile({Key? key}) : super(key: key);
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final item = ref.read(currentItem);
+    return ListTile(
+      key: ValueKey(item.id),
+      title: Text(item.name),
+      trailing: Checkbox(
+          value: item.obtained,
+          onChanged: (val) => ref
+              .read(itemListControllerProvider.notifier)
+              .updateItem(
+                  updatedItem: item.copyWith(obtained: !item.obtained))),
+      onTap: () => AddItemDialog.show(context, item),
+      onLongPress: () => ref
+          .read(itemListControllerProvider.notifier)
+          .deleteItem(itemId: item.id!),
+    );
+  }
+}
+
+class ItemListError extends HookConsumerWidget {
+  final String message;
+  const ItemListError({
+    Key? key,
+    required this.message,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Center(
+        child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          message,
+          style: const TextStyle(fontSize: 20),
+        ),
+        SizedBox(height: 20),
+        ElevatedButton(
+            onPressed: () => ref
+                .read(itemListControllerProvider.notifier)
+                .retrieveItems(isRefreshing: true),
+            child: const Text('リトライ'))
+      ],
     ));
   }
 }

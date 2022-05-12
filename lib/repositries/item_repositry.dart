@@ -16,7 +16,7 @@ abstract class BaseItemRepositry {
 }
 
 final itemRepositoryProvider =
-    Provider<ItemRepositry>(((ref) => ItemRepositry(ref.read)));
+    Provider<ItemRepositry>((ref) => ItemRepositry(ref.read));
 
 class ItemRepositry implements BaseItemRepositry {
   final Reader _read;
@@ -27,7 +27,7 @@ class ItemRepositry implements BaseItemRepositry {
   Future<List<Item>> retrieveItems({required String userId}) async {
     try {
       final snap =
-          await _read(firebaseFirestoreProvider).usersListRef(userId).get();
+          await _read(firebaseFirestoreProvider).userListRef(userId).get();
       return snap.docs.map((doc) => Item.fromDocument(doc)).toList();
     } on FirebaseException catch (e) {
       throw CustomException(message: e.message);
@@ -39,7 +39,7 @@ class ItemRepositry implements BaseItemRepositry {
       {required String userId, required Item item}) async {
     try {
       final docRef = await _read(firebaseFirestoreProvider)
-          .usersListRef(userId)
+          .userListRef(userId)
           .add(item.toDocument());
       return docRef.id;
     } on FirebaseException catch (e) {
@@ -52,20 +52,19 @@ class ItemRepositry implements BaseItemRepositry {
       {required String userId, required String itemId}) async {
     try {
       await _read(firebaseFirestoreProvider)
-          .usersListRef(userId)
+          .userListRef(userId)
           .doc(itemId)
           .delete();
     } on FirebaseException catch (e) {
       throw CustomException(message: e.message);
     }
-    throw UnimplementedError();
   }
 
   @override
   Future<void> updateItem({required String userId, required Item item}) async {
     try {
       await _read(firebaseFirestoreProvider)
-          .usersListRef(userId)
+          .userListRef(userId)
           .doc(item.id)
           .update(item.toDocument());
     } on FirebaseException catch (e) {
